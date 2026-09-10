@@ -1,0 +1,36 @@
+name: Validate WebLab
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Check required WebLab elements
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          html = Path('index.html').read_text()
+          required = [
+              'id="html"', 'id="css"', 'id="js"', 'id="frame"',
+              'id="out"', 'id="run"', 'three@0.186.0', 'WEBLAB_CONSOLE'
+          ]
+          missing = [item for item in required if item not in html]
+          if missing:
+              raise SystemExit(f'Missing required elements: {missing}')
+          marker = '<script type="module">'
+          start = html.index(marker) + len(marker)
+          end = html.rindex('</script>')
+          Path('/tmp/weblab-app.mjs').write_text(html[start:end])
+          print('Static WebLab checks passed')
+          PY
+      - name: Check JavaScript syntax
+        run: node --check /tmp/weblab-app.mjs
